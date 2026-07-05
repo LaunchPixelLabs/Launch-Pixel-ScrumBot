@@ -1,0 +1,9 @@
+name = "lp-backend-worker"
+main = "src/index.js"
+compatibility_date = "2024-05-01"
+
+[vars]
+DATABASE_URL = "YOUR_DATABASE_URL_HERE"
+WHATSAPP_VERIFY_TOKEN = "launchpixel_token"
+# To enable instant WhatsApp to Discord routing with zero lag, paste your Discord Channel Webhook URL here:
+DISCORD_WHATSAPP_WEBHOOK_URL = ""

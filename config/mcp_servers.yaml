@@ -1,0 +1,22 @@
+# External MCP Servers Configuration
+# Only external servers that require a subprocess or HTTP connection are listed here.
+# Internal tools (like DevOpsBackend and Chroma) are handled natively in the tool registry.
+
+taiga:
+  # Set enabled to true if you want to connect to Taiga
+  enabled: false
+  transport: stdio
+  command: python
+  args: ["-m", "langchain_taiga.mcp_server"]
+  env:
+    TAIGA_API_URL: "${TAIGA_API_URL}"
+    TAIGA_TOKEN: "${TAIGA_TOKEN}"
+
+discord_api:
+  # Set enabled to true if you want to use the Discord API MCP for advanced searching
+  enabled: false
+  transport: stdio
+  command: npx
+  args: ["-y", "mcp-discord"]
+  env:
+    DISCORD_TOKEN: "${DISCORD_TOKEN}"

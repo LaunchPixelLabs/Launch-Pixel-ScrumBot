@@ -1,0 +1,12 @@
+# Map Discord channels to DevOpsBackend projects
+
+discord_channels:
+  # The channel where standups and notifications happen
+  - channel_id: 123456789012345678
+    channel_name: "dev-general"
+    project: "launchpixel"
+
+# Map DevOpsBackend User IDs to Discord Usernames/IDs
+user_map:
+  1: "admin_discord_id"
+  2: "dev_discord_id"
