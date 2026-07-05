@@ -17,6 +17,7 @@ langchain-chroma>=0.1.0
 langgraph>=0.2.50
 langgraph-checkpoint-postgres>=0.1.0
 fastembed>=0.2.0
+duckduckgo-search>=5.0.0
 
 fastmcp>=2.8.0
 composio-langchain>=0.2.0
