@@ -18,7 +18,8 @@ langgraph>=0.2.50
 langgraph-checkpoint-postgres>=0.1.0
 fastembed>=0.2.0
 duckduckgo-search>=5.0.0
-
+wikipedia>=1.4.0
+arxiv>=2.1.0
 fastmcp>=2.8.0
 composio-langchain>=0.2.0
 
