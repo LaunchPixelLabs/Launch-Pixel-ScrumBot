@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    # Gemini is the "second brain": quick single-shot generations (blocker
+    # advice, standup nudges) via the google-genai SDK, separate from the
+    # NVIDIA NIM / Nemotron core agent used by the slash commands.
+    gemini_model: str = "gemini-2.5-flash"
     nvidia_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
 
@@ -78,6 +82,11 @@ class Settings(BaseSettings):
 
     # --- Integrations ------------------------------------------------------
     composio_api_key: Optional[str] = None
+    # Composio is opt-in. Tools only load when an API key AND a user id with
+    # connected accounts are configured; ``composio_toolkits`` is a
+    # comma-separated allowlist (e.g. "GMAIL,GITHUB"). Empty => no Composio tools.
+    composio_user_id: Optional[str] = None
+    composio_toolkits: Optional[str] = None
     whatsapp_verify_token: Optional[str] = "launchpixel_token"
 
     # --- Webhook receiver (DevOps -> Discord) ------------------------------

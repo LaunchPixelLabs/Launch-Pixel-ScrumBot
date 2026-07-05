@@ -31,26 +31,51 @@ def get_web_tools() -> List[BaseTool]:
 from scrumbot.custom_backend.db_tools import get_neon_tools
 
 def get_composio_tools() -> List[BaseTool]:
-    """Retrieve integration tools from Composio."""
-    try:
-        import os
-        from scrumbot.config import get_settings
-        # We pass API key if composio_api_key is in settings, else we rely on composio core to throw if missing
-        api_key = get_settings().composio_api_key
-        if api_key:
-            toolset = ComposioToolSet(api_key=api_key)
-        else:
-            toolset = ComposioToolSet()
-        # We can add explicit apps like GITHUB, JIRA or generic actions
-        # For this agency Scrum Master, let's load all standard tools
-        return toolset.get_tools()
-    except ImportError:
-        import logging
-        logging.getLogger(__name__).warning("composio-langchain not installed or failed to initialize.")
+    """Retrieve integration tools from Composio, if configured.
+
+    Composio is fully optional; the agent is complete without it. Tools only
+    load when ``COMPOSIO_API_KEY``, ``COMPOSIO_USER_ID`` and
+    ``COMPOSIO_TOOLKITS`` are all set (a user id with connected accounts is
+    required to enumerate real tools). We support the modern provider-based SDK
+    and fall back to the legacy ``ComposioToolSet``; any failure degrades to an
+    empty list rather than crashing app startup.
+    """
+    import logging
+
+    from scrumbot.config import get_settings
+
+    log = logging.getLogger(__name__)
+    settings = get_settings()
+    api_key = settings.composio_api_key
+    if not api_key or not settings.composio_user_id or not settings.composio_toolkits:
+        log.info("Composio not fully configured (need API key, user id, toolkits); skipping.")
         return []
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Composio failed to initialize: {e}")
+
+    toolkits = [t.strip().upper() for t in settings.composio_toolkits.split(",") if t.strip()]
+
+    # Modern provider-based SDK (composio + composio-langchain >= 0.8).
+    try:
+        from composio import Composio
+        from composio_langchain import LangchainProvider
+
+        client = Composio(api_key=api_key, provider=LangchainProvider())
+        tools = client.tools.get(user_id=settings.composio_user_id, toolkits=toolkits)
+        log.info("Loaded %d Composio tools for toolkits=%s", len(tools), toolkits)
+        return list(tools)
+    except ImportError:
+        pass  # fall through to legacy API
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully
+        log.warning("Composio (modern SDK) init failed: %s", exc)
+        return []
+
+    # Legacy ToolSet API (composio-langchain < 0.8).
+    try:
+        from composio_langchain import ComposioToolSet
+
+        toolset = ComposioToolSet(api_key=api_key)
+        return list(toolset.get_tools(apps=toolkits))
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully
+        log.warning("Composio (legacy SDK) unavailable: %s", exc)
         return []
 
 def get_all_tools(devops_client: Optional[DevOpsClient] = None) -> List[BaseTool]:

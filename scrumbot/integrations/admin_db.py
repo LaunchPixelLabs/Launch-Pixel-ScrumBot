@@ -64,6 +64,35 @@ def create_ticket(ticket_id, title, description, assignee_id, assignee_name, pri
     finally:
         conn.close()
 
+def create_devops_task(title, description, status="Pending", story_points=1):
+    """Insert a task into ``devops_tasks`` and return its new integer id.
+
+    Used by the LangGraph agent's ``create_ticket`` tool (the Nemotron core
+    brain); the ``!ticket create`` Discord flow uses :func:`create_ticket`
+    instead, which also wires up channels and Kanban cards.
+    """
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO devops_tasks (
+                    title, description, status, "storyPoints", "createdAt", "updatedAt"
+                ) VALUES (%s, %s, %s, %s, NOW(), NOW()) RETURNING id;
+                """,
+                (title, description, status, story_points),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return new_id
+    except Exception as e:
+        print(f"❌ Error creating devops task: {e}")
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+
 def get_active_tickets():
     conn = get_conn()
     try:
@@ -84,7 +113,8 @@ def get_active_tickets():
                     "assignee_name": "Unknown",
                     "channel_id": t['links'][0].get('discord_channel_id') if t.get('links') else None,
                     "thread_id": t['links'][0].get('discord_thread_id') if t.get('links') else None,
-                    "end_date": None
+                    "end_date": None,
+                    "updated_at": t.get('updatedAt'),
                 })
             return results
     except Exception as e:

@@ -90,7 +90,11 @@ class ScrumBot(commands.Bot):
         intents.message_content = True
         intents.guilds = True
         intents.messages = True
-        super().__init__(*args, command_prefix="!", intents=intents, **kwargs)
+        # LaunchPixelCog ships a custom `!help`; disable discord.py's default help
+        # command so the two don't collide during add_cog.
+        super().__init__(
+            *args, command_prefix="!", intents=intents, help_command=None, **kwargs
+        )
         self.app = app
         self.dispatcher = Dispatcher(app)
 
