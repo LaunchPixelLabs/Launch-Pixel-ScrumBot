@@ -8,8 +8,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
 from scrumbot.integrations import admin_db as db
-import whatsapp_webhook
-from gmail_sync import GmailSync
+# import whatsapp_webhook
+# from gmail_sync import GmailSync
 from scrumbot.config import get_settings
 
 class LaunchPixelCog(commands.Cog):
@@ -22,21 +22,9 @@ class LaunchPixelCog(commands.Cog):
                 self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
             except Exception as e:
                 print(f'Failed to initialize Gemini: {e}')
-        self.gmail_client_sync = GmailSync()
+        # self.gmail_client_sync = GmailSync()
         # Initialize tasks
         self.poll_gmail.start()
-
-
-# Load environment variables
-
-# Initialize Discord Bot
-intents.message_content = True
-# Disabled privileged members intent to avoid developer portal restriction errors
-
-# Initialize Gemini Client if API key is present
-
-# Initialize Gmail Sync client
-
 
 # File DB for Tickets
 DB_FILE = 'tickets.json'
@@ -715,6 +703,7 @@ class OnboardingView(discord.ui.View):
             
         await ctx.send("🤔 Let me think about how to unblock you...")
         
+        try:
             prompt = (
                 f"You are an expert Agile Scrum Master helping a 5-person agency called 'Launch Pixel'. "
                 f"A team member has reported the following blocker: '{description}'. "
@@ -728,6 +717,8 @@ class OnboardingView(discord.ui.View):
             )
             
             await ctx.send(f"💡 **AI Scrum Master Advice:**\n{response.text}")
+        except Exception as e:
+            await ctx.send(f"⚠️ **Error generating advice:** {str(e)}")
             await ctx.send(f"❌ Oops, I had trouble thinking about that: {str(e)}")
     
     # Fallback error handlers
@@ -738,78 +729,47 @@ class OnboardingView(discord.ui.View):
     
     # ================= INTEGRATIONS & WEBHOOKS =================
     
-    @tasks.loop(minutes=2)
-    async def poll_gmail(self):
-        """Polls Gmail for unread messages and uses Gemini to summarize them as Scrum Master."""
-        if not self.gmail_client_sync.is_configured:
-            return
-    
-            emails = self.gmail_client_sync.fetch_latest_emails(max_results=5)
-            if not emails:
-                return
-    
-            for email in emails:
-                for guild in self.bot.guilds:
-                    channel = discord.utils.find(lambda c: c.name.lower() == "client-emails", guild.text_channels)
-                    if channel:
-                        summary_text = "*(AI Scrum Master key not configured - showing raw preview)*\n\n" + email["body"][:400]
-                        if self.gemini_client:
-                            try:
-                                prompt = (
-                                    f"You are the expert Agile Scrum Master for 'Launch Pixel' (a 5-person agency). We received an email:\n"
-                                    f"From: {email['sender']}\n"
-                                    f"Subject: {email['subject']}\n"
-                                    f"Body: {email['body']}\n\n"
-                                    f"Summarize this email in exactly 3-4 professional, action-oriented sentences. "
-                                    f"Outline: 1) What the client wants, 2) Key ticket items to create, 3) Immediate blockers for our team."
-                                )
-                                response = self.gemini_client.models.generate_content(
-                                    model='gemini-2.5-flash',
-                                    contents=prompt
-                                )
-                                summary_text = response.text
-                            except Exception as e:
-                                print(f"Failed to summarize email via Gemini: {e}")
-                        
-                        embed = discord.Embed(
-                            title=f"✉️ Client Email: {email['subject']}",
-                            description=summary_text,
-                            color=0x3498DB
-                        )
-                        embed.add_field(name="From", value=email["sender"], inline=True)
-                        embed.add_field(name="Date", value=email["date"], inline=True)
-                        embed.set_footer(text="Summarized by LP AI Scrum Master")
-                        
-                        await channel.send(embed=embed)
-            print(f"⚠️ Error polling Gmail: {e}")
-    
-async def post_whatsapp_to_discord(sender_name, sender_phone, body):
-        """Coro to post WhatsApp message to the whatsapp-sync channel."""
-        for guild in self.bot.guilds:
-            channel = discord.utils.find(lambda c: c.name.lower() == "whatsapp-sync", guild.text_channels)
-            if channel:
-                embed = discord.Embed(
-                    title="💬 WhatsApp Chat Sync",
-                    description=body,
-                    color=0x2ECC71
-                )
-                embed.add_field(name="From", value=sender_name, inline=True)
-                embed.add_field(name="Phone", value=sender_phone, inline=True)
-                embed.set_footer(text="Synced via LP WhatsApp Webhook")
-                await channel.send(embed=embed)
-    
-def handle_whatsapp_message(sender_name, sender_phone, body):
-        """Callback triggered by the Flask thread when a new WhatsApp message arrives."""
-        coro = post_whatsapp_to_discord(sender_name, sender_phone, body)
-        asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
-    
-    # Register WhatsApp callback
-    
-    # Start Flask server in background thread
-def start_webhook_server():
-        print("🌐 [Flask Webhook] Launching WhatsApp sync endpoint at http://localhost:5001/webhook...")
-            whatsapp_webhook.run_server(port=5001)
-            print(f"⚠️ Flask Webhook failed to start: {e}")
-    
-    
-    
+    # @tasks.loop(minutes=2)
+    # async def poll_gmail(self):
+    #     """Polls Gmail for unread messages and uses Gemini to summarize them as Scrum Master."""
+    #     if not self.gmail_client_sync.is_configured:
+    #         return
+    # 
+    #         emails = self.gmail_client_sync.fetch_latest_emails(max_results=5)
+    #         if not emails:
+    #             return
+    # 
+    #         for email in emails:
+    #             for guild in self.bot.guilds:
+    #                 channel = discord.utils.find(lambda c: c.name.lower() == "client-emails", guild.text_channels)
+    #                 if channel:
+    #                     summary_text = "*(AI Scrum Master key not configured - showing raw preview)*\n\n" + email["body"][:400]
+    #                     if self.gemini_client:
+    #                         try:
+    #                             prompt = (
+    #                                 f"You are the expert Agile Scrum Master for 'Launch Pixel' (a 5-person agency). We received an email:\n"
+    #                                 f"From: {email['sender']}\n"
+    #                                 f"Subject: {email['subject']}\n"
+    #                                 f"Body: {email['body']}\n\n"
+    #                                 f"Summarize this email in exactly 3-4 professional, action-oriented sentences. "
+    #                                 f"Outline: 1) What the client wants, 2) Key ticket items to create, 3) Immediate blockers for our team."
+    #                             )
+    #                             response = self.gemini_client.models.generate_content(
+    #                                 model='gemini-2.5-flash',
+    #                                 contents=prompt
+    #                             )
+    #                             summary_text = response.text
+    #                         except Exception as e:
+    #                             print(f"Failed to summarize email via Gemini: {e}")
+    #                     
+    #                     embed = discord.Embed(
+    #                         title=f"✉️ Client Email: {email['subject']}",
+    #                         description=summary_text,
+    #                         color=0x3498DB
+    #                     )
+    #                     embed.add_field(name="From", value=email["sender"], inline=True)
+    #                     embed.add_field(name="Date", value=email["date"], inline=True)
+    #                     embed.set_footer(text="Summarized by LP AI Scrum Master")
+    #                     
+    #                     await channel.send(embed=embed)
+    #         print(f"⚠️ Error polling Gmail: {e}")
