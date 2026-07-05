@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     # --- Discord -----------------------------------------------------------
     discord_token: Optional[str] = None
     scrum_bot_token: Optional[str] = None
+    discord_client_id: Optional[str] = None
+    discord_client_secret: Optional[str] = None
     # Channel the scheduled daily standup is posted to; unset disables it.
     standup_channel_id: Optional[int] = None
 

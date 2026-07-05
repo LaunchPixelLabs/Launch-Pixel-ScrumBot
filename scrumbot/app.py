@@ -51,7 +51,7 @@ class ScrumBotApp:
 
         # Agent (LLM + tools + memory).
         llm = get_llm(self.settings.scrum_agent_model, self.settings)
-        tools = get_all_tools(self.devops_client)
+        tools = get_all_tools(self.devops_client, self.collector)
         checkpointer = build_checkpointer(self.settings)
         self.agent = ScrumAgent(llm, tools, checkpointer=checkpointer)
 

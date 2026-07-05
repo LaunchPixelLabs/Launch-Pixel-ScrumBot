@@ -73,10 +73,13 @@ async def _run(mode: str) -> None:
                     for chunk in chunk_message(text):
                         await channel.send(chunk)
 
+                import os
+                port = int(os.environ.get("PORT", settings.webhook_port))
+                
                 tasks.append(
                     asyncio.create_task(
                         serve_webhooks(
-                            app, settings.webhook_host, settings.webhook_port, notify=_notify
+                            app, settings.webhook_host, port, notify=_notify
                         ),
                         name="webhooks",
                     )
@@ -124,8 +127,12 @@ def main() -> None:
     try:
         async def run_all():
             import os
-            # If we are on Render (PORT is set), also run the dummy server
-            if os.environ.get("RENDER") or os.environ.get("PORT"):
+            
+            is_render = bool(os.environ.get("RENDER") or os.environ.get("PORT"))
+            will_start_webhooks = (args.mode == "both" and get_settings().webhook_secret)
+            
+            # If we are on Render and NOT starting webhooks, run the dummy server to satisfy Render's port binding rule.
+            if is_render and not will_start_webhooks:
                 await asyncio.gather(
                     _run(args.mode),
                     _start_dummy_server()

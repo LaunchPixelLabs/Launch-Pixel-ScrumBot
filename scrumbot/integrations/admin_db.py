@@ -211,3 +211,71 @@ def log_expense(amount, service_vertical, category, description, payment_mode="o
         return None
     finally:
         conn.close()
+
+# --- Company Knowledge (Dynamic Memory) ---
+
+def init_company_knowledge_table():
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS company_knowledge (
+                    id SERIAL PRIMARY KEY,
+                    topic VARCHAR(255) UNIQUE NOT NULL,
+                    content TEXT NOT NULL,
+                    "updatedAt" TIMESTAMP DEFAULT NOW()
+                );
+                """
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"❌ Error creating company_knowledge table: {e}")
+    finally:
+        conn.close()
+
+# Ensure the table is created at startup
+init_company_knowledge_table()
+
+def get_company_knowledge() -> str:
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT topic, content, \"updatedAt\" FROM company_knowledge ORDER BY \"updatedAt\" DESC;")
+            rows = cur.fetchall()
+            if not rows:
+                return "No company knowledge found yet."
+            
+            context = "LaunchPixel Company Knowledge & SOPs:\n\n"
+            for row in rows:
+                context += f"### {row['topic']} (Last updated: {row['updatedAt']})\n"
+                context += f"{row['content']}\n\n"
+            return context
+    except Exception as e:
+        print(f"⚠️ Error fetching company knowledge: {e}")
+        return "Error fetching company knowledge."
+    finally:
+        conn.close()
+
+def upsert_company_knowledge(topic: str, content: str) -> bool:
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO company_knowledge (topic, content, "updatedAt") 
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (topic) DO UPDATE SET 
+                    content = EXCLUDED.content,
+                    "updatedAt" = EXCLUDED."updatedAt";
+                """,
+                (topic, content)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"❌ Error upserting company knowledge: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()

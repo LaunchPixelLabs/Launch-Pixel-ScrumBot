@@ -28,7 +28,47 @@ def get_web_tools() -> List[BaseTool]:
     ]
 
 
-from scrumbot.custom_backend.db_tools import get_neon_tools
+from langchain_core.tools import tool
+from scrumbot.integrations.admin_db import get_company_knowledge, upsert_company_knowledge
+from scrumbot.llm import get_llm
+from langchain_core.messages import HumanMessage, SystemMessage
+
+@tool
+def ask_business_brain(query: str) -> str:
+    """Consult the specialized Gemini Business Brain for LaunchPixel business strategy, SOPs, KPIs, and operational knowledge.
+    
+    Use this tool whenever you need deep business context or to answer a question that requires agency/company knowledge.
+    """
+    try:
+        # 1. Fetch dynamic memory from NeonDB
+        context = get_company_knowledge()
+        
+        # 2. Instantiate the Gemini "Business Brain"
+        gemini_brain = get_llm(model_name="gemini-2.5-flash")
+        
+        # 3. Create the prompt combining the context and the user query
+        messages = [
+            SystemMessage(content=f"You are the LaunchPixel Business Brain. You know all about the company's SOPs, KPIs, and rules.\n\n{context}"),
+            HumanMessage(content=query)
+        ]
+        
+        # 4. Ask Gemini
+        response = gemini_brain.invoke(messages)
+        return response.content
+    except Exception as e:
+        return f"Error consulting Business Brain: {str(e)}"
+
+@tool
+def learn_business_rule(topic: str, content: str) -> str:
+    """Save or update a business rule, SOP, or KPI into the LaunchPixel company knowledge database.
+    
+    Use this tool when the founder tells you to remember a new business rule, KPI, or SOP. 
+    The topic should be a short, clear title (e.g. 'Project Kickoff SOP', 'Performance KPIs').
+    """
+    success = upsert_company_knowledge(topic, content)
+    if success:
+        return f"Successfully saved business knowledge under topic: {topic}"
+    return f"Failed to save business knowledge for topic: {topic}"
 
 def get_composio_tools() -> List[BaseTool]:
     """Retrieve integration tools from Composio, if configured.
@@ -78,13 +118,17 @@ def get_composio_tools() -> List[BaseTool]:
         log.warning("Composio (legacy SDK) unavailable: %s", exc)
         return []
 
-def get_all_tools(devops_client: Optional[DevOpsClient] = None) -> List[BaseTool]:
+from scrumbot.data.collector import DiscordChatCollector
+from scrumbot.custom_backend.db_tools import get_neon_tools
+
+def get_all_tools(devops_client: Optional[DevOpsClient] = None, chat_collector: Optional[DiscordChatCollector] = None) -> List[BaseTool]:
     """Assemble the full tool set for the agent.
 
     Args:
         devops_client: When provided, DevOps board tools bound to this client
             are included. When ``None`` (e.g. a research-only deployment) only
             the web tools are returned.
+        chat_collector: When provided, enables the search_discord_history tool.
     """
     tools: List[BaseTool] = get_web_tools()
     
@@ -96,4 +140,65 @@ def get_all_tools(devops_client: Optional[DevOpsClient] = None) -> List[BaseTool
     
     if devops_client is not None:
         tools.extend(get_devops_tools(devops_client))
-    return tools
+        
+    # Add Dual-Brain / Business Knowledge Tools
+    tools.extend([ask_business_brain, learn_business_rule])
+    
+    if chat_collector is not None:
+        @tool
+        async def search_discord_history(query: str, limit: int = 5) -> str:
+            """Search the Discord semantic memory for past conversations, messages, or decisions.
+            
+            Use this tool to recall context when a user asks about something discussed previously in Discord.
+            """
+            try:
+                results = await chat_collector.search_messages(query, k=limit)
+                if not results:
+                    return "No relevant past messages found in Discord."
+                formatted = []
+                for doc in results:
+                    author = doc.metadata.get("author", "Unknown")
+                    date = doc.metadata.get("timestamp", "Unknown Date")
+                    formatted.append(f"[{date}] {author}: {doc.page_content}")
+                return "\n".join(formatted)
+            except Exception as e:
+                return f"Error searching Discord history: {str(e)}"
+                
+        tools.append(search_discord_history)
+    
+    # Catch tool exceptions so they return to the agent instead of crashing the run.
+    from langchain_core.tools import StructuredTool
+    
+    safe_tools = []
+    for t in tools:
+        if isinstance(t, BaseTool):
+            # Create a wrapper that safely catches ALL exceptions.
+            def _make_safe_run(orig_run):
+                def safe_run(*args, **kwargs):
+                    try:
+                        return orig_run(*args, **kwargs)
+                    except NotImplementedError:
+                        raise
+                    except Exception as e:
+                        return f"Tool Execution Error: {str(e)}"
+                return safe_run
+                
+            def _make_safe_arun(orig_arun):
+                async def safe_arun(*args, **kwargs):
+                    try:
+                        if orig_arun is None:
+                            return None
+                        return await orig_arun(*args, **kwargs)
+                    except NotImplementedError:
+                        raise
+                    except Exception as e:
+                        return f"Tool Execution Error: {str(e)}"
+                return safe_arun
+            
+            t._run = _make_safe_run(t._run)
+            if hasattr(t, "_arun") and getattr(t, "_arun", None) is not None:
+                t._arun = _make_safe_arun(t._arun)
+            
+            safe_tools.append(t)
+            
+    return safe_tools
