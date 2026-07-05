@@ -4,7 +4,8 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 load_dotenv()
-DATABASE_URL = os.getenv('DATABASE_URL')
+from scrumbot.config import get_settings
+DATABASE_URL = get_settings().database_url
 
 def get_conn():
     try:

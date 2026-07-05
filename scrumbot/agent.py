@@ -28,8 +28,8 @@ def build_checkpointer(settings: Optional[Settings] = None):
     if the driver/connection is unavailable), otherwise an in-process
     ``MemorySaver``.
     """
-    import os
-    database_url = os.getenv("DATABASE_URL")
+    settings = settings or get_settings()
+    database_url = settings.database_url
     if database_url:
         try:
             from langgraph.checkpoint.postgres import PostgresSaver

@@ -10,12 +10,13 @@ from google import genai
 from scrumbot.integrations import admin_db as db
 import whatsapp_webhook
 from gmail_sync import GmailSync
+from scrumbot.config import get_settings
 
 class LaunchPixelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.gemini_client = None
-        GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+        GEMINI_API_KEY = get_settings().gemini_api_key
         if GEMINI_API_KEY and GEMINI_API_KEY != 'your_gemini_api_key_here':
             try:
                 self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)

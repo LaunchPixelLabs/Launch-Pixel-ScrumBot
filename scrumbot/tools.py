@@ -34,9 +34,9 @@ def get_composio_tools() -> List[BaseTool]:
     """Retrieve integration tools from Composio."""
     try:
         import os
-        from composio_langchain import ComposioToolSet, Action
-        # We pass API key if COMPOSIO_API_KEY is in env, else we rely on composio core to throw if missing
-        api_key = os.getenv("COMPOSIO_API_KEY", "")
+        from scrumbot.config import get_settings
+        # We pass API key if composio_api_key is in settings, else we rely on composio core to throw if missing
+        api_key = get_settings().composio_api_key
         if api_key:
             toolset = ComposioToolSet(api_key=api_key)
         else:

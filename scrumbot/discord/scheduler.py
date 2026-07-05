@@ -29,7 +29,7 @@ class ScrumScheduler(commands.Cog):
         self.gemini_client = None
         
         # We try to use Gemini/Nemotron if available for the sassy nagging
-        GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+        GEMINI_API_KEY = get_settings().gemini_api_key
         if GEMINI_API_KEY and GEMINI_API_KEY != 'your_gemini_api_key_here':
             try:
                 self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)

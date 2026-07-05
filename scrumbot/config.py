@@ -37,11 +37,13 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
     nvidia_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
 
     # --- Discord -----------------------------------------------------------
     discord_token: Optional[str] = None
+    scrum_bot_token: Optional[str] = None
     # Channel the scheduled daily standup is posted to; unset disables it.
     standup_channel_id: Optional[int] = None
 
@@ -62,9 +64,9 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # --- Agent memory / checkpointer --------------------------------------
-    # If set, LangGraph state is persisted to MongoDB; otherwise an in-process
+    # If set, LangGraph state is persisted to PostgreSQL; otherwise an in-process
     # MemorySaver is used (conversation memory survives within a process).
-    mongo_db_url: Optional[str] = None
+    database_url: Optional[str] = None
 
     # --- Async work queue --------------------------------------------------
     queue_workers: int = 3
@@ -73,6 +75,10 @@ class Settings(BaseSettings):
     mcp_transport: Literal["stdio", "http", "sse"] = "stdio"
     mcp_host: str = "127.0.0.1"
     mcp_port: int = 8765
+
+    # --- Integrations ------------------------------------------------------
+    composio_api_key: Optional[str] = None
+    whatsapp_verify_token: Optional[str] = "launchpixel_token"
 
     # --- Webhook receiver (DevOps -> Discord) ------------------------------
     # When webhook_secret is set, `--mode both` also starts the receiver.
