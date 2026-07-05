@@ -21,7 +21,7 @@ from scrumbot.prompts import SYSTEM_PROMPT
 logger = logging.getLogger(__name__)
 
 
-def build_checkpointer():
+def build_checkpointer(settings: Optional[Settings] = None):
     """Return a LangGraph checkpointer.
 
     Uses PostgreSQL when ``DATABASE_URL`` is configured (falling back to in-memory
