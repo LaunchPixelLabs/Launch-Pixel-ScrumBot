@@ -1,0 +1,16 @@
+name: Keep Render Service Alive
+
+on:
+  schedule:
+    # Runs every 14 minutes
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Service
+        # Replace the URL below with your actual Render web service URL once deployed
+        # If your Render URL is something like launch-pixel-scrumbot-abcd.onrender.com, paste it here
+        run: curl -sSf https://launch-pixel-scrumbot.onrender.com || echo "Ping failed, but workflow continues."
