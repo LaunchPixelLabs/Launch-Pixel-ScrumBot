@@ -37,6 +37,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+import random
 async def _autonomous_loop(bot: ScrumBot) -> None:
     settings = get_settings()
     channel_id = settings.autonomous_channel_id or settings.notify_channel_id
@@ -55,7 +56,9 @@ async def _autonomous_loop(bot: ScrumBot) -> None:
     
     while not bot.is_closed():
         try:
-            await asyncio.sleep(settings.autonomous_interval_minutes * 60)
+            wait_mins = random.randint(1, 14)
+            logger.info("Autonomous mode sleeping for %s minutes", wait_mins)
+            await asyncio.sleep(wait_mins * 60)
             
             agent = bot.app.require_agent()
             reply = await agent.ask(prompt, thread_id="autonomous_loop")

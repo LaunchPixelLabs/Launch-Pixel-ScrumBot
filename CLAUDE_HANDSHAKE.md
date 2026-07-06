@@ -3,24 +3,23 @@
 Hello Claude! 👋 I am Antigravity, the AI agent handling the **infrastructure and deployment** side of this project. The user and I have agreed to split the work: I will continue focusing on deployment, environment variables, and cloud hosting (Render), while you take over the **codebase enhancement and feature development**.
 
 ## 🚀 Current Project Status
-- **Discord Bot**: Successfully boots and connects to the server.
-- **Hosting**: Deployed on Render. We recently fixed some deployment crash loops caused by missing dependencies (`arxiv`, `wikipedia`, `duckduckgo-search`).
-- **Recent Fixes**: I just repaired a fatal `IndentationError` in `scrumbot/discord/launchpixel_cog.py` that was crashing the bot during startup.
+- **Discord Bot**: Successfully boots and connects to the server, deployed to Render.
+- **Autonomous Loop**: I just added a new `_autonomous_loop` in `main.py`! The bot will now wake up at random intervals between 1 and 14 minutes, completely replacing the need for cron jobs. It proactively checks GitHub, tracks finances, and reports to Discord if it finds something noteworthy!
+- **Core Agent Engine**: I switched the default agent back to `gemini-2.5-flash` for flawless LangChain tool calling, since NVIDIA NIM Llama 3.1 70b was strictly demanding prompt formatting and failing when given blank commands.
 
 ## 🛠️ Your Focus Areas (The Code)
-The user wants you to look at the codebase and enhance it. Here are some immediate areas that need your attention:
+The user wants you to look at the codebase and enhance the Scrum Master's intelligence! Here are some immediate areas that need your attention:
 
-1. **Missing Integrations (`launchpixel_cog.py`)**: 
-   - The user recently pasted some custom Cog code, but it relies on two modules that do not exist in this repository: `whatsapp_webhook` and `gmail_sync`.
-   - I have safely **commented out** these imports and the broken logic at the bottom of `scrumbot/discord/launchpixel_cog.py` so the bot could boot. 
+1. **The Autonomous Loop Prompt**:
+   - Check `main.py` -> `_autonomous_loop()`. The prompt I gave the agent is a bit generic ("track finances, find leads, etc"). 
+   - Please refine this prompt or enhance the `ScrumAgent` logic so the bot can actually be "smart", use its memory system effectively, and actually act like a 24/7 asynchronous worker.
+
+2. **Missing Integrations (`launchpixel_cog.py`)**: 
+   - I safely **commented out** some broken imports (`whatsapp_webhook` and `gmail_sync`) previously. 
    - **Your Task**: Implement these missing modules (WhatsApp syncing and Gmail polling) or rewrite the integrations to fit the current architecture.
 
-2. **Codebase Cleanup**: 
-   - Review `launchpixel_cog.py` and the general bot structure. The recent pasted code introduced some floating global variables (which I removed) and mangled indentation. 
-   - Please ensure the `discord.py` cogs are structured following best practices.
-
 3. **Feature Enhancements**: 
-   - Enhance the AI Scrum Master logic (which uses the Gemini API).
+   - Enhance the AI Scrum Master logic and how it interacts with the Composio Tools.
    - Improve the `/blocker` command and email summarization prompts.
 
 ## 🤝 How We Will Collaborate
