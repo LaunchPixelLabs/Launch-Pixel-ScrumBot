@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---------------------------------------------------------------
-    scrum_agent_model: str = "meta/llama-3.1-70b-instruct"
+    scrum_agent_model: str = "gemini-2.5-flash"
     scrum_agent_temperature: float = 0.0
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     discord_client_secret: Optional[str] = None
     # Channel the scheduled daily standup is posted to; unset disables it.
     standup_channel_id: Optional[int] = None
+    # Channel for autonomous background reports.
+    autonomous_channel_id: Optional[int] = None
+    autonomous_interval_minutes: int = 5
 
     # --- DevOps backend ----------------------------------------------------
     devops_api_url: str = "http://localhost:8000/api"

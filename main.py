@@ -37,6 +37,41 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+async def _autonomous_loop(bot: ScrumBot) -> None:
+    settings = get_settings()
+    channel_id = settings.autonomous_channel_id or settings.notify_channel_id
+    if not channel_id or settings.autonomous_interval_minutes <= 0:
+        logger.info("Autonomous mode disabled (no channel or interval <= 0).")
+        return
+        
+    await bot.wait_until_ready()
+    logger.info("Starting autonomous background loop (every %s mins) on channel %s", settings.autonomous_interval_minutes, channel_id)
+    
+    prompt = (
+        "You are in autonomous background mode. Use your tools to check for new updates (emails, Slack, GitHub issues, Notion docs), "
+        "track finances, manage resources, or find leads. If you discover anything actionable, important, or noteworthy, summarize it clearly for the team. "
+        "If there are no meaningful updates, simply respond with exactly 'ALL_GOOD' and nothing else."
+    )
+    
+    while not bot.is_closed():
+        try:
+            await asyncio.sleep(settings.autonomous_interval_minutes * 60)
+            
+            agent = bot.app.require_agent()
+            reply = await agent.ask(prompt, thread_id="autonomous_loop")
+            
+            if "ALL_GOOD" not in reply:
+                channel = bot.get_channel(channel_id)
+                if channel:
+                    for chunk in chunk_message(f"**🤖 Autonomous Report:**\n{reply}"):
+                        await channel.send(chunk)
+                else:
+                    logger.warning("Autonomous channel %s not found.", channel_id)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Autonomous loop error: %s", e)
+
 async def _run(mode: str) -> None:
     settings = get_settings()
     bot: ScrumBot | None = None
@@ -49,6 +84,7 @@ async def _run(mode: str) -> None:
                     raise SystemExit("DISCORD_TOKEN is required to run the Discord bot.")
                 bot = ScrumBot(app)
                 tasks.append(asyncio.create_task(bot.start(settings.discord_token), name="discord"))
+                tasks.append(asyncio.create_task(_autonomous_loop(bot), name="autonomous"))
 
             if mode in ("mcp", "both"):
                 transport = settings.mcp_transport
