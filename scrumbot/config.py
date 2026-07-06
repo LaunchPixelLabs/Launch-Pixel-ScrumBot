@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---------------------------------------------------------------
-    scrum_agent_model: str = "nvidia/llama-3.1-nemotron-70b-instruct"
+    scrum_agent_model: str = "meta/llama-3.1-70b-instruct"
     scrum_agent_temperature: float = 0.0
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
