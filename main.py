@@ -298,10 +298,11 @@ async def _run(mode: str) -> None:
         tasks: list[asyncio.Task] = []
         try:
             if mode in ("discord", "both"):
-                if not settings.discord_token:
-                    raise SystemExit("DISCORD_TOKEN is required to run the Discord bot.")
+                token = settings.get_discord_token
+                if not token:
+                    raise SystemExit("DISCORD_TOKEN or SCRUM_BOT_TOKEN is required to run the Discord bot.")
                 bot = ScrumBot(app)
-                tasks.append(asyncio.create_task(bot.start(settings.discord_token), name="discord"))
+                tasks.append(asyncio.create_task(bot.start(token), name="discord"))
                 tasks.append(asyncio.create_task(_autonomous_loop(bot), name="autonomous"))
                 tasks.append(asyncio.create_task(_founder_alert_loop(bot), name="founder_alerts"))
                 tasks.append(asyncio.create_task(_keepalive_loop(bot), name="keepalive"))

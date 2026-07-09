@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     scrum_bot_token: Optional[str] = None
     discord_client_id: Optional[str] = None
     discord_client_secret: Optional[str] = None
+
+    @property
+    def get_discord_token(self) -> Optional[str]:
+        return self.discord_token or self.scrum_bot_token
     # Channel the scheduled daily standup is posted to; unset disables it.
     standup_channel_id: Optional[int] = None
     # Channel for autonomous background reports.

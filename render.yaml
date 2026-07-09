@@ -13,5 +13,7 @@ services:
         sync: false
       - key: COMPOSIO_API_KEY
         sync: false
+      - key: COMPOSIO_USER_ID
+        sync: false
       - key: PYTHON_VERSION
         value: 3.10.10

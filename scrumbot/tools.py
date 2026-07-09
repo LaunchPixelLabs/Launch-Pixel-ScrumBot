@@ -6,6 +6,7 @@ its pooled HTTP connection.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ from langchain_community.tools.ddg_search.tool import DuckDuckGoSearchRun
 from langchain_community.tools.wikipedia.tool import WikipediaQueryRun
 from langchain_community.utilities.arxiv import ArxivAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, tool
 
 from scrumbot.custom_backend.client import DevOpsClient
 from scrumbot.custom_backend.tools import get_devops_tools
@@ -31,7 +32,18 @@ def get_web_tools() -> List[BaseTool]:
     ]
 
 
-from langchain_core.tools import tool
+@tool
+def research_competitor(query: str) -> str:
+    """Web search specifically tailored for researching competitors in the launchpixel.in market.
+    
+    Use this tool to find competitive intelligence, agency pricing trends, and new tools 
+    other elite agencies are using.
+    """
+    search = DuckDuckGoSearchRun()
+    # Optionally, we can inject context into the query, but we'll let the model construct it.
+    return search.invoke(query)
+
+
 from scrumbot.integrations.admin_db import get_company_knowledge, upsert_company_knowledge
 from scrumbot.llm import get_llm
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -156,6 +168,7 @@ def get_all_tools(
             agent can put high-stakes decisions to both brains.
     """
     tools: List[BaseTool] = get_web_tools()
+    tools.append(research_competitor)
 
     # Add Neon DB tools for Discord Kanban
     tools.extend(get_neon_tools())
