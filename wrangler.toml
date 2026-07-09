@@ -1,0 +1,7 @@
+name = "lp-scrum-bot"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+main = "src/index.ts"
+
+# When you run `npx wrangler secret put X`, they will be stored securely on Cloudflare.
+# For local dev, you can use `.dev.vars` (same format as `.env`).
