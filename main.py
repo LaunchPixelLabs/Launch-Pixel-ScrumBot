@@ -79,6 +79,8 @@ async def _autonomous_loop(bot: ScrumBot) -> None:
     channel_id = settings.autonomous_channel_id or settings.notify_channel_id
     if not channel_id or settings.autonomous_interval_minutes <= 0:
         logger.info("Autonomous mode disabled (no channel or interval <= 0).")
+        while not bot.is_closed():
+            await asyncio.sleep(3600)
         return
 
     await bot.wait_until_ready()
@@ -182,6 +184,8 @@ async def _founder_alert_loop(bot: ScrumBot) -> None:
             "Founder alert loop disabled (founder_id=%s, channel_id=%s).",
             founder_id, channel_id,
         )
+        while not bot.is_closed():
+            await asyncio.sleep(3600)
         return
 
     await bot.wait_until_ready()
@@ -262,6 +266,8 @@ async def _keepalive_loop(_bot: ScrumBot) -> None:
     url = settings.keepalive_url or os.environ.get("KEEPALIVE_URL")
     if not url:
         logger.info("Keep-alive loop disabled (no KEEPALIVE_URL).")
+        while not _bot.is_closed():
+            await asyncio.sleep(3600)
         return
 
     url = url.rstrip("/")
