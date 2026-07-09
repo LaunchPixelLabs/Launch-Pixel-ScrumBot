@@ -42,8 +42,8 @@ You must inject the following secure variables into your Cloudflare Worker envir
 | `DATABASE_URL` | Your NeonDB Postgres connection string. |
 | `LLM_API_KEY` | Your Groq or NVIDIA NIM API Key. |
 | `LLM_BASE_URL` | The base URL for your LLM provider (e.g., `https://api.groq.com/openai/v1`). |
-| `LP_PORTAL_BASE_URL` | The API URL for your LaunchPixel backend (e.g., `https://adminapi.launchpixel.in/api`). |
-| `LP_PORTAL_API_KEY` | The secure `x-api-key` required to authenticate with the LaunchPixel backend. |
+| `LP_PORTAL_BASE_URL` | The API URL for your project management backend (e.g., `https://api.yourcompany.com`). |
+| `LP_PORTAL_API_KEY` | The secure `x-api-key` required to authenticate with the backend. |
 
 *(Note: Never commit these keys to version control!)*
 
