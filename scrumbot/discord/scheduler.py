@@ -29,6 +29,7 @@ class ScrumScheduler(commands.Cog):
         self.bot = bot
         settings = get_settings()
         self._channel_id = settings.standup_channel_id
+        self._leads_channel_id = settings.leads_channel_id or settings.standup_channel_id
         self._gemini_model = settings.gemini_model
         self._composio_enabled = bool(
             settings.composio_api_key and settings.composio_user_id and settings.composio_toolkits
@@ -133,6 +134,21 @@ class ScrumScheduler(commands.Cog):
 
         await channel.send(message)
 
+        # Queue a critical founder escalation for stale tickets so it doesn't
+        # just live in the channel feed — the drainer in main.py will @mention +
+        # DM the founder. Cap the DM summary to the top 5 so it stays readable.
+        try:
+            head = stale_tickets[:5]
+            more = f"\n…and {len(stale_tickets) - 5} more" if len(stale_tickets) > 5 else ""
+            summary = "\n".join(f"• {line}" for line in head) + more
+            admin_db.create_founder_alert(
+                severity="critical",
+                topic=f"{len(stale_tickets)} stale tickets (>48h no update)",
+                summary=summary,
+            )
+        except Exception as exc:
+            logger.warning("Failed to queue founder alert for stale tickets: %s", exc)
+
     @staticmethod
     def _is_stale(ticket: dict, now: datetime.datetime) -> bool:
         """A ticket is stale if it hasn't been updated within ``_STALE_AFTER``.
@@ -165,35 +181,37 @@ class ScrumScheduler(commands.Cog):
     @tasks.loop(hours=2)
     async def poll_leads(self) -> None:
         logger.info("Polling Gmail for leads via Composio...")
-        if not self._channel_id:
+        if not self._leads_channel_id:
             return
-            
+
         try:
             # Get the app and agent from the cog's bot if we attached it
             app = getattr(self.bot, "app", None)
             if not app or not app.agent:
                 return
-                
+
             prompt = (
                 "Use your Composio GMAIL tools to search for recent emails (last 24 hours) "
-                "that look like new business leads or inquiries. If you find any:\n"
-                "1. Summarize the lead (Who, what they want).\n"
-                "2. Draft a professional, conversion-focused response.\n"
-                "3. Return the summary and the drafted response in your final answer.\n"
+                "that look like new business leads or inquiries. For each real lead:\n"
+                "1. Summarize the lead (who they are, what they want).\n"
+                "2. Score it 0-100 for fit/intent and log it with the `save_lead` tool "
+                "(source='gmail').\n"
+                "3. Draft a professional, conversion-focused response.\n"
+                "Return the summary, score, and drafted response in your final answer.\n"
                 "If no new leads are found, return 'NO_LEADS'."
             )
-            
+
             response = await app.agent.ask(prompt, thread_id="lead_polling_thread")
-            
+
             if "NO_LEADS" not in response and len(response.strip()) > 20:
-                channel = self.bot.get_channel(self._channel_id)
+                channel = self.bot.get_channel(self._leads_channel_id)
                 if channel:
                     msg = f"📩 **New Lead Detected!**\n\n{response}"
                     # Truncate if discord limits (2000 chars)
                     if len(msg) > 1900:
                         msg = msg[:1900] + "...[truncated]"
                     await channel.send(msg)
-                    
+
         except Exception as e:
             logger.error(f"Error polling leads: {e}")
 

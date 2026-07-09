@@ -81,6 +81,38 @@ class ScrumCommands(commands.Cog):
         await interaction.response.defer(thinking=True)
         await self._queue.enqueue(self._dispatch.handle_clear, interaction)
 
+    # --- business-intel quick commands -----------------------------------
+
+    @app_commands.command(name="leads", description="Summarise the lead pipeline.")
+    async def leads(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_leads, interaction)
+
+    @app_commands.command(name="finance", description="Summarise recent spend and burn.")
+    async def finance(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_finance, interaction)
+
+    @app_commands.command(name="business", description="Ask the Business Brain about SOPs, KPIs, strategy.")
+    async def business(self, interaction: discord.Interaction, question: str) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_business, interaction, question)
+
+    @app_commands.command(name="briefing", description="Generate a founder-ready morning briefing.")
+    async def briefing(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_briefing, interaction)
+
+    @app_commands.command(name="decisions", description="List recent Dual-Brain council decisions.")
+    async def decisions(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_decisions, interaction)
+
+    @app_commands.command(name="status", description="Short live status-of-the-business snapshot.")
+    async def status(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True)
+        await self._queue.enqueue(self._dispatch.handle_status, interaction)
+
 
 class ScrumBot(commands.Bot):
     """The Discord bot, bound to a started :class:`ScrumBotApp`."""

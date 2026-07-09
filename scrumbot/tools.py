@@ -6,7 +6,10 @@ its pooled HTTP connection.
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from scrumbot.brains import DualBrainCouncil
 
 from langchain_community.tools.arxiv.tool import ArxivQueryRun
 from langchain_community.tools.ddg_search.tool import DuckDuckGoSearchRun
@@ -32,41 +35,57 @@ from langchain_core.tools import tool
 from scrumbot.integrations.admin_db import get_company_knowledge, upsert_company_knowledge
 from scrumbot.llm import get_llm
 from langchain_core.messages import HumanMessage, SystemMessage
+from scrumbot.skills import SkillsManager
+
+# Module-level TTL cache for the Business Brain. Identical queries within the
+# TTL window skip the Gemini round-trip entirely (real latency/API savings).
+_brain_cache = SkillsManager(ttl_seconds=900)  # 15 minutes
+
 
 @tool
-def ask_business_brain(query: str) -> str:
+async def ask_business_brain(query: str) -> str:
     """Consult the specialized Gemini Business Brain for LaunchPixel business strategy, SOPs, KPIs, and operational knowledge.
-    
+
     Use this tool whenever you need deep business context or to answer a question that requires agency/company knowledge.
     """
+    cache_key = (query or "").strip().lower()
+    cached = await _brain_cache.get_skill(cache_key)
+    if cached is not None:
+        return cached
     try:
-        # 1. Fetch dynamic memory from NeonDB
-        context = get_company_knowledge()
-        
+        # 1. Fetch dynamic memory from NeonDB (blocking call -> off the event loop)
+        context = await asyncio.to_thread(get_company_knowledge)
+
         # 2. Instantiate the Gemini "Business Brain"
         gemini_brain = get_llm(model_name="gemini-2.5-flash")
-        
+
         # 3. Create the prompt combining the context and the user query
         messages = [
             SystemMessage(content=f"You are the LaunchPixel Business Brain. You know all about the company's SOPs, KPIs, and rules.\n\n{context}"),
-            HumanMessage(content=query)
+            HumanMessage(content=query),
         ]
-        
-        # 4. Ask Gemini
-        response = gemini_brain.invoke(messages)
-        return response.content
+
+        # 4. Ask Gemini (also blocking -> off the event loop)
+        response = await asyncio.to_thread(gemini_brain.invoke, messages)
+        result = response.content
+        await _brain_cache.set_skill(cache_key, result)
+        return result
     except Exception as e:
         return f"Error consulting Business Brain: {str(e)}"
+
 
 @tool
 def learn_business_rule(topic: str, content: str) -> str:
     """Save or update a business rule, SOP, or KPI into the LaunchPixel company knowledge database.
-    
-    Use this tool when the founder tells you to remember a new business rule, KPI, or SOP. 
+
+    Use this tool when the founder tells you to remember a new business rule, KPI, or SOP.
     The topic should be a short, clear title (e.g. 'Project Kickoff SOP', 'Performance KPIs').
     """
     success = upsert_company_knowledge(topic, content)
     if success:
+        # Invalidate the brain cache so subsequent queries pick up the new rule.
+        # Best-effort: a missed clear just means a 15-min stale entry.
+        _brain_cache._cache.clear()
         return f"Successfully saved business knowledge under topic: {topic}"
     return f"Failed to save business knowledge for topic: {topic}"
 
@@ -121,7 +140,11 @@ def get_composio_tools() -> List[BaseTool]:
 from scrumbot.data.collector import DiscordChatCollector
 from scrumbot.custom_backend.db_tools import get_neon_tools
 
-def get_all_tools(devops_client: Optional[DevOpsClient] = None, chat_collector: Optional[DiscordChatCollector] = None) -> List[BaseTool]:
+def get_all_tools(
+    devops_client: Optional[DevOpsClient] = None,
+    chat_collector: Optional[DiscordChatCollector] = None,
+    council: Optional["DualBrainCouncil"] = None,
+) -> List[BaseTool]:
     """Assemble the full tool set for the agent.
 
     Args:
@@ -129,20 +152,28 @@ def get_all_tools(devops_client: Optional[DevOpsClient] = None, chat_collector: 
             are included. When ``None`` (e.g. a research-only deployment) only
             the web tools are returned.
         chat_collector: When provided, enables the search_discord_history tool.
+        council: When provided, exposes the ``consult_dual_brain`` tool so the
+            agent can put high-stakes decisions to both brains.
     """
     tools: List[BaseTool] = get_web_tools()
-    
+
     # Add Neon DB tools for Discord Kanban
     tools.extend(get_neon_tools())
-    
+
     # Add Composio Tools
     tools.extend(get_composio_tools())
-    
+
     if devops_client is not None:
         tools.extend(get_devops_tools(devops_client))
-        
+
     # Add Dual-Brain / Business Knowledge Tools
     tools.extend([ask_business_brain, learn_business_rule])
+
+    # Dual-Brain council tool (both brains vote on high-stakes decisions).
+    if council is not None:
+        from scrumbot.brains import make_dual_brain_tool
+
+        tools.append(make_dual_brain_tool(council))
     
     if chat_collector is not None:
         @tool

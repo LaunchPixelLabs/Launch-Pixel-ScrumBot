@@ -107,3 +107,59 @@ class Dispatcher:
             "List all tasks whose status is 'Done' so they can be archived, and "
             "summarise them.",
         )
+
+    # --- business-intel quick commands ------------------------------------
+
+    async def handle_leads(self, interaction: discord.Interaction) -> None:
+        await self._respond(
+            interaction,
+            "Give a concise summary of the lead pipeline. Call `list_leads` (and "
+            "`company_snapshot` if useful), then report: how many leads at each "
+            "stage, the top open leads by score, and which ones need follow-up "
+            "right now.",
+        )
+
+    async def handle_finance(self, interaction: discord.Interaction) -> None:
+        await self._respond(
+            interaction,
+            "Summarise recent finances. Call `get_expense_summary` (30 days) and "
+            "`list_expenses`, then report total spend, the breakdown by vertical "
+            "and category, and flag anything unusual worth the founder's attention.",
+        )
+
+    async def handle_business(self, interaction: discord.Interaction, question: str) -> None:
+        await self._respond(
+            interaction,
+            f"Answer this question about LaunchPixel's business (SOPs, KPIs, "
+            f"strategy, positioning) by consulting `ask_business_brain` first, "
+            f"then `company_snapshot` for live numbers if relevant.\n\n"
+            f"Question: {question}",
+        )
+
+    async def handle_briefing(self, interaction: discord.Interaction) -> None:
+        await self._respond(
+            interaction,
+            "Produce a founder-ready morning briefing. Call `company_snapshot` for "
+            "the live business state and `list_decisions` for anything ruled on "
+            "recently, then deliver: board health (active/overdue), the lead "
+            "pipeline (top open leads + what needs follow-up), 7-day spend, any "
+            "pending escalations, and the single most important thing to act on "
+            "today. Lead with the headline, then bullets.",
+        )
+
+    async def handle_decisions(self, interaction: discord.Interaction) -> None:
+        await self._respond(
+            interaction,
+            "List the most recent high-stakes decisions the Dual-Brain council has "
+            "made, using `list_decisions`. For each, give the decision id, the "
+            "question, and the verdict in one line.",
+        )
+
+    async def handle_status(self, interaction: discord.Interaction) -> None:
+        await self._respond(
+            interaction,
+            "Give a short status-of-the-business read by calling `company_snapshot`. "
+            "Report active vs overdue tickets, the lead pipeline at a glance, 7-day "
+            "spend, and any pending founder escalations. Keep it tight — a few "
+            "lines, not a wall of text.",
+        )

@@ -5,3 +5,18 @@ __pycache__/
 venv/
 env/
 .DS_Store
+# Added by code-review-graph
+.code-review-graph/
+
+# IDE / AI-tool config (personal, not shared)
+.claude/
+.cursor/
+.cursorrules
+.kiro/
+.mcp.json
+.opencode.json
+.serena/
+.windsurfrules
+AGENTS.md
+CLAUDE.md
+GEMINI.md

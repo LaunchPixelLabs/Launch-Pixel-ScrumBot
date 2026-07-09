@@ -13,6 +13,7 @@ import logging
 from typing import Optional
 
 from scrumbot.agent import ScrumAgent, build_checkpointer
+from scrumbot.brains import DualBrainCouncil
 from scrumbot.config import Settings, get_settings
 from scrumbot.custom_backend.client import DevOpsClient
 from scrumbot.data.chroma import ChromaManager
@@ -32,6 +33,7 @@ class ScrumBotApp:
         self.devops_client: Optional[DevOpsClient] = None
         self.chroma: Optional[ChromaManager] = None
         self.collector: Optional[DiscordChatCollector] = None
+        self.council: Optional[DualBrainCouncil] = None
         self.agent: Optional[ScrumAgent] = None
         self.queue: Optional[RequestQueue] = None
         self._started = False
@@ -41,7 +43,12 @@ class ScrumBotApp:
         if self._started:
             return self
 
-        logger.info("Starting ScrumBotApp (model=%s)...", self.settings.scrum_agent_model)
+        logger.info(
+            "Starting ScrumBotApp (dual_brain=%s, lead=%s, backup=%s)...",
+            self.settings.enable_dual_brain,
+            self.settings.primary_model,
+            self.settings.secondary_model,
+        )
 
         # Integrations + data layer.
         self.devops_client = DevOpsClient(self.settings)
@@ -49,11 +56,26 @@ class ScrumBotApp:
         self.chroma = await asyncio.to_thread(ChromaManager, self.settings)
         self.collector = DiscordChatCollector(self.chroma)
 
-        # Agent (LLM + tools + memory).
-        llm = get_llm(self.settings.scrum_agent_model, self.settings)
-        tools = get_all_tools(self.devops_client, self.collector)
+        # Seed the Business Brain scaffold (idempotent, best-effort, off-loop).
+        if self.settings.seed_business_knowledge:
+            await asyncio.to_thread(self._seed_knowledge)
+
+        # Dual-Brain council: Nemotron leads (51%), Gemini backs & co-decides (49%).
+        self.council = DualBrainCouncil.from_settings(self.settings)
+
+        # Agent (Dual-Brain LLM + tools + memory).
+        tools = get_all_tools(self.devops_client, self.collector, council=self.council)
         checkpointer = build_checkpointer(self.settings)
-        self.agent = ScrumAgent(llm, tools, checkpointer=checkpointer)
+        if self.settings.enable_dual_brain:
+            self.agent = ScrumAgent.dual_brain(
+                self.council.primary,
+                self.council.secondary,
+                tools,
+                checkpointer=checkpointer,
+            )
+        else:
+            llm = get_llm(self.settings.scrum_agent_model, self.settings)
+            self.agent = ScrumAgent(llm, tools, checkpointer=checkpointer)
 
         # Async work queue for offloading LLM turns off the Discord event loop.
         self.queue = RequestQueue(num_workers=self.settings.queue_workers)
@@ -84,3 +106,15 @@ class ScrumBotApp:
         if self.agent is None:
             raise RuntimeError("ScrumBotApp.startup() must be awaited before use.")
         return self.agent
+
+    @staticmethod
+    def _seed_knowledge() -> None:
+        """Seed the starter business-knowledge scaffold (best-effort)."""
+        try:
+            from scrumbot.integrations.admin_db import seed_default_business_knowledge
+
+            seeded = seed_default_business_knowledge()
+            if seeded:
+                logger.info("Seeded %d starter business-knowledge topics.", seeded)
+        except Exception as exc:  # noqa: BLE001 - never block startup on the DB
+            logger.warning("Business-knowledge seed skipped: %s", exc)

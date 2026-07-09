@@ -126,7 +126,113 @@ def create_webhook_app(app: ScrumBotApp, notify: Optional[Notifier] = None) -> F
                 await notify(message)
         return {"ok": True}
 
+    # --- WhatsApp inbound (Meta Cloud API) ---------------------------------
+
+    @api.get("/webhooks/whatsapp")
+    async def whatsapp_verify(request: Request):
+        """Meta webhook verification handshake."""
+        params = request.query_params
+        mode = params.get("hub.mode")
+        token = params.get("hub.verify_token")
+        challenge = params.get("hub.challenge")
+        if mode == "subscribe" and token and token == settings.whatsapp_verify_token:
+            logger.info("WhatsApp webhook verified.")
+            # Meta expects the raw challenge echoed back as text/plain.
+            from fastapi.responses import PlainTextResponse
+
+            return PlainTextResponse(challenge or "")
+        raise HTTPException(status_code=403, detail="verification failed")
+
+    @api.post("/webhooks/whatsapp")
+    async def whatsapp_receive(request: Request) -> dict:
+        """Mirror inbound WhatsApp client messages into Discord."""
+        payload = await request.json()
+        for line in _extract_whatsapp_messages(payload):
+            logger.info("WhatsApp inbound: %s", line)
+            if notify is not None:
+                msg = f"💬 **WhatsApp — Client Message**\n{line}"
+                if app.queue is not None:
+                    await app.queue.enqueue(notify, msg)
+                else:
+                    await notify(msg)
+        return {"ok": True}
+
+    # --- ACP: Agent Communication Protocol surface -------------------------
+    # A minimal HTTP surface (sibling to the MCP server) so other agents/systems
+    # can task the Scrum Master directly. Runs are authenticated with the webhook
+    # secret because they can take real actions on the board/pipeline.
+
+    @api.get("/acp/agents")
+    async def acp_agents() -> dict:
+        """Return this agent's ACP capability card."""
+        return {
+            "agents": [
+                {
+                    "name": "launchpixel-scrum-master",
+                    "description": (
+                        "Dual-Brain (Nemotron lead + Gemini) AI Scrum Master for "
+                        "LaunchPixel: board, leads, finance, and business knowledge."
+                    ),
+                    "input_schema": {"type": "object", "properties": {"input": {"type": "string"}}},
+                    "endpoints": {"run": "/acp/runs"},
+                }
+            ]
+        }
+
+    @api.post("/acp/runs")
+    async def acp_run(
+        request: Request,
+        x_webhook_secret: Optional[str] = Header(default=None),
+    ) -> dict:
+        """Run the agent for an external caller and return the output (ACP-style)."""
+        if settings.webhook_secret and x_webhook_secret != settings.webhook_secret:
+            raise HTTPException(status_code=401, detail="invalid webhook secret")
+        body = await request.json()
+        # Accept either {"input": "..."} or ACP-style {"inputs": [{"content": "..."}]}.
+        text = body.get("input")
+        if not text and isinstance(body.get("inputs"), list) and body["inputs"]:
+            first = body["inputs"][0]
+            text = first.get("content") if isinstance(first, dict) else str(first)
+        if not text:
+            raise HTTPException(status_code=400, detail="missing 'input'")
+        thread_id = body.get("session_id") or body.get("thread_id") or "acp"
+        try:
+            output = await app.require_agent().ask(str(text), thread_id=str(thread_id))
+        except Exception as exc:  # noqa: BLE001 - report to the caller
+            logger.exception("ACP run failed")
+            raise HTTPException(status_code=500, detail=str(exc))
+        return {
+            "run_id": thread_id,
+            "status": "completed",
+            "outputs": [{"role": "agent", "content": output}],
+        }
+
     return api
+
+
+def _extract_whatsapp_messages(payload: dict) -> list[str]:
+    """Pull human-readable lines out of a Meta WhatsApp webhook payload."""
+    lines: list[str] = []
+    if payload.get("object") != "whatsapp_business_account":
+        return lines
+    for entry in payload.get("entry", []):
+        for change in entry.get("changes", []):
+            value = change.get("value", {}) or {}
+            contacts = value.get("contacts", []) or []
+            for message in value.get("messages", []) or []:
+                sender = message.get("from", "Unknown")
+                name = sender
+                if contacts:
+                    name = contacts[0].get("profile", {}).get("name", sender)
+                mtype = message.get("type", "text")
+                if mtype == "text":
+                    body = message.get("text", {}).get("body", "")
+                elif mtype == "button":
+                    body = message.get("button", {}).get("text", "[Button Click]")
+                else:
+                    body = f"[{mtype.capitalize()} message]"
+                lines.append(f"**{name}** ({sender}): {body}")
+    return lines
 
 
 async def serve_webhooks(

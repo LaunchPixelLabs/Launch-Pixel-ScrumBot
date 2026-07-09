@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
@@ -19,6 +20,27 @@ from scrumbot.config import Settings, get_settings
 from scrumbot.prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+
+def build_dual_brain_model(
+    primary: BaseChatModel,
+    secondary: Optional[BaseChatModel],
+    tools: Sequence[BaseTool],
+) -> Runnable:
+    """Wire the two brains into a single model runnable for the agent.
+
+    Nemotron (``primary``) leads every turn; Gemini (``secondary``) is bound with
+    the same tools and registered as an automatic fallback, so a turn the lead
+    brain botches (a malformed tool call, a transient NIM error) is transparently
+    retried on the second brain rather than crashing the run. When there is no
+    second brain the primary is returned unbound and the agent binds it itself.
+    """
+    if secondary is None:
+        return primary
+    tool_list = list(tools)
+    lead = primary.bind_tools(tool_list)
+    backup = secondary.bind_tools(tool_list)
+    return lead.with_fallbacks([backup])
 
 
 def build_checkpointer(settings: Optional[Settings] = None):
@@ -56,12 +78,15 @@ class ScrumAgent:
 
     def __init__(
         self,
-        llm: BaseChatModel,
+        llm: "BaseChatModel | Runnable",
         tools: Sequence[BaseTool],
         *,
         checkpointer: Any = None,
         system_prompt: str = SYSTEM_PROMPT,
     ) -> None:
+        # ``llm`` may be a plain chat model (create_react_agent binds the tools
+        # for us) or an already-tool-bound runnable such as the dual-brain
+        # fallback chain from :func:`build_dual_brain_model` (used as-is).
         self._checkpointer = checkpointer
         self._agent = create_react_agent(
             llm,
@@ -69,6 +94,20 @@ class ScrumAgent:
             prompt=system_prompt,
             checkpointer=checkpointer,
         )
+
+    @classmethod
+    def dual_brain(
+        cls,
+        primary: BaseChatModel,
+        secondary: Optional[BaseChatModel],
+        tools: Sequence[BaseTool],
+        *,
+        checkpointer: Any = None,
+        system_prompt: str = SYSTEM_PROMPT,
+    ) -> "ScrumAgent":
+        """Build a ScrumAgent whose model is the Nemotron-lead / Gemini-backup council."""
+        model = build_dual_brain_model(primary, secondary, tools)
+        return cls(model, tools, checkpointer=checkpointer, system_prompt=system_prompt)
 
     async def invoke(
         self,

@@ -22,6 +22,7 @@ from google import genai
 
 from scrumbot.config import get_settings
 from scrumbot.integrations import admin_db as db
+from scrumbot.discord.views import TaskView
 
 logger = logging.getLogger(__name__)
 
@@ -738,7 +739,8 @@ class LaunchPixelCog(commands.Cog):
             )
 
         embed.set_footer(text="Task logged in Neon Postgres Serverless DB")
-        await ctx.send(embed=embed)
+        view = TaskView(ticket_id=ticket_id, callback_func=self._handle_ticket_action)
+        await ctx.send(embed=embed, view=view)
 
     # ================= STANDUP & AI BLOCKER RESOLUTION =================
 
@@ -799,28 +801,39 @@ class LaunchPixelCog(commands.Cog):
 
     @commands.command(name="blocker")
     async def blocker(self, ctx: commands.Context, *, description: str) -> None:
-        """Ask the AI Scrum Master (Gemini) for help resolving a blocker."""
-        if not self.gemini_client:
+        """Ask the AI Scrum Master (Dual-Brain) for help resolving a blocker."""
+        council = getattr(getattr(self.bot, "app", None), "council", None)
+        if council is None and not self.gemini_client:
             await ctx.send(
-                "🧠 My AI brain isn't connected yet! Please add a valid `GEMINI_API_KEY` to the environment."
+                "🧠 My AI brain isn't connected yet! Please add a valid `GEMINI_API_KEY` "
+                "(and ideally `NVIDIA_API_KEY`) to the environment."
             )
             return
 
+        prompt = (
+            "A team member at 'Launch Pixel', a fast-moving product agency, reported "
+            f"this blocker:\n\n\"{description}\"\n\n"
+            "Respond with:\n"
+            "1. A one-line diagnosis of the likely root cause.\n"
+            "2. Two or three concrete, practical next steps to unblock.\n"
+            "3. Who on a small agency team they should pair with, if relevant.\n"
+            "Keep it under 140 words, encouraging and direct. Use Discord markdown."
+        )
+
+        # Prefer the Dual-Brain council (Nemotron lead + Gemini) so both brains
+        # weigh in; fall back to a single Gemini shot if the council is absent.
+        powered_by = "Dual-Brain (Nemotron + Gemini)"
         async with ctx.typing():
-            prompt = (
-                "You are an expert Agile Scrum Master for 'Launch Pixel', a fast-moving "
-                "5-person product agency. A team member reported this blocker:\n\n"
-                f"\"{description}\"\n\n"
-                "Respond with:\n"
-                "1. A one-line diagnosis of the likely root cause.\n"
-                "2. Two or three concrete, practical next steps to unblock.\n"
-                "3. Who on a small agency team they should pair with, if relevant.\n"
-                "Keep it under 120 words, encouraging and direct. Use Discord markdown."
-            )
             try:
-                advice = await self._gemini(prompt)
+                if council is not None:
+                    advice = await council.decide(prompt)
+                    if not council.dual:
+                        powered_by = "Gemini"
+                else:
+                    advice = await self._gemini(prompt)
+                    powered_by = "Gemini"
             except Exception as exc:  # noqa: BLE001 - report to user
-                logger.exception("Gemini blocker generation failed")
+                logger.exception("Blocker generation failed")
                 await ctx.send(f"⚠️ I had trouble thinking about that: {exc}")
                 return
 
@@ -830,7 +843,7 @@ class LaunchPixelCog(commands.Cog):
             color=0x9B5DE5,
         )
         embed.add_field(name="Reported Blocker", value=description[:1024], inline=False)
-        embed.set_footer(text=f"Requested by {ctx.author.display_name} • Powered by Gemini")
+        embed.set_footer(text=f"Requested by {ctx.author.display_name} • Powered by {powered_by}")
         await ctx.send(embed=embed)
 
     # ================= HELPERS & ERROR HANDLERS =================
@@ -846,6 +859,62 @@ class LaunchPixelCog(commands.Cog):
                 await channel.send(message)
             except discord.errors.HTTPException as exc:
                 logger.warning("Failed to post activity log: %s", exc)
+
+    async def _handle_ticket_action(
+        self, interaction: discord.Interaction, ticket_id: str, action: str
+    ) -> None:
+        """Callback for TaskView buttons — updates DB, Kanban tag, and channel."""
+        status_map = {"done": "Resolved", "blocked": "Active", "in_progress": "Active"}
+        status = status_map.get(action, "Active")
+        label = action.replace("_", " ").title()
+        ticket_id = ticket_id.upper()
+
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "❌ This button only works inside a server.", ephemeral=True
+            )
+            return
+
+        t = db.get_ticket(ticket_id)
+        if not t:
+            await interaction.response.send_message(f"❌ Ticket `{ticket_id}` not found!", ephemeral=True)
+            return
+
+        db.update_ticket_status(ticket_id, status)
+
+        # Update the Kanban forum tag if the thread exists.
+        if t.get("thread_id"):
+            forum_channel = discord.utils.find(
+                lambda c: c.name.lower() == "kanban-board", guild.forums
+            )
+            if forum_channel:
+                thread = guild.get_thread(t["thread_id"])
+                if thread:
+                    try:
+                        new_tag = discord.utils.find(
+                            lambda tag: tag.name.lower() == status.lower(),
+                            forum_channel.available_tags,
+                        )
+                        applied_tags = [new_tag] if new_tag else []
+                        await thread.edit(applied_tags=applied_tags)
+                    except Exception as exc:  # noqa: BLE001 - forum is optional
+                        logger.warning("Failed to update forum tag: %s", exc)
+
+        # Update the workspace channel topic if it exists.
+        channel = guild.get_channel(t.get("channel_id")) if t.get("channel_id") else None
+        if channel:
+            await channel.send(
+                f"🔄 Status changed to **{status}** via button ({interaction.user.name})."
+            )
+
+        await interaction.response.send_message(
+            f"✅ Ticket **{ticket_id}** marked as {label}.", ephemeral=True
+        )
+        await self._log_activity(
+            guild,
+            f"🔄 **{interaction.user.name}** set **{ticket_id}** to {label} (button).",
+        )
 
     @setup_server.error
     async def setup_server_error(self, ctx: commands.Context, error: commands.CommandError) -> None:

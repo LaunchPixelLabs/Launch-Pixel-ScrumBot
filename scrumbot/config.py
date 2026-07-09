@@ -32,7 +32,11 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---------------------------------------------------------------
-    scrum_agent_model: str = "gemini-2.5-flash"
+    # ``scrum_agent_model`` is the single-brain override. When ``enable_dual_brain``
+    # is on (the default) it is ignored in favour of the primary/secondary pair
+    # below, which run as one council: Nemotron leads every call and Gemini backs
+    # it up. Kept for back-compat and single-brain deployments.
+    scrum_agent_model: str = "nvidia/llama-3.1-nemotron-70b-instruct"
     scrum_agent_temperature: float = 0.0
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
@@ -45,6 +49,19 @@ class Settings(BaseSettings):
     nvidia_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
 
+    # --- Dual-Brain council ------------------------------------------------
+    # The agent runs on two brains at once. Nemotron (NVIDIA NIM) is the *lead*
+    # (51%) and drives every reasoning + tool-calling turn; Gemini (49%) is the
+    # automatic fallback for any turn Nemotron fails, and the co-voter the agent
+    # consults for high-stakes decisions via the ``consult_dual_brain`` tool.
+    # If no NVIDIA key is present the council transparently degrades to Gemini
+    # only, so the bot always boots.
+    enable_dual_brain: bool = True
+    primary_model: str = "nvidia/llama-3.1-nemotron-70b-instruct"
+    secondary_model: str = "gemini-2.5-flash"
+    primary_weight: float = 0.51
+    secondary_weight: float = 0.49
+
     # --- Discord -----------------------------------------------------------
     discord_token: Optional[str] = None
     scrum_bot_token: Optional[str] = None
@@ -55,6 +72,20 @@ class Settings(BaseSettings):
     # Channel for autonomous background reports.
     autonomous_channel_id: Optional[int] = None
     autonomous_interval_minutes: int = 5
+    # Autonomous loop wakes at a random interval in [min, max] minutes so it
+    # feels like a living teammate rather than a fixed cron. Kept tight (4-7)
+    # so the bot does something valuable roughly every 5 minutes.
+    autonomous_min_minutes: int = 4
+    autonomous_max_minutes: int = 7
+    # Channel where new business leads are announced.
+    leads_channel_id: Optional[int] = None
+    # Channel where inbound WhatsApp client messages are mirrored.
+    whatsapp_channel_id: Optional[int] = None
+    # Discord user id of the founder/CEO, used for escalation @mentions.
+    founder_discord_id: Optional[int] = None
+    # When true, the startup routine seeds a starter business-knowledge scaffold
+    # (idempotent; never overwrites founder-authored topics).
+    seed_business_knowledge: bool = True
 
     # --- DevOps backend ----------------------------------------------------
     devops_api_url: str = "http://localhost:8000/api"
@@ -101,6 +132,12 @@ class Settings(BaseSettings):
     webhook_port: int = 8080
     # Channel that inbound board events are announced in.
     notify_channel_id: Optional[int] = None
+
+    # --- Render keep-alive -------------------------------------------------
+    # The bot self-pings this URL every 10 minutes so Render's free tier never
+    # sleeps (GitHub Actions is the primary pinger; this is the backup). Set to
+    # the public Render service URL, e.g. https://launch-pixel-scrumbot.onrender.com
+    keepalive_url: Optional[str] = None
 
     # --- Observability -----------------------------------------------------
     log_level: str = "INFO"

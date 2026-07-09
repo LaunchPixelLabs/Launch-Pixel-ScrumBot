@@ -52,10 +52,14 @@ def get_llm(
     if "gemini" in lowered:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
+        # Accept either GOOGLE_API_KEY or GEMINI_API_KEY. Only the latter is set
+        # in this deployment, so without this fallback the LangChain agent's
+        # Gemini calls would be unauthenticated (they'd look for GOOGLE_API_KEY
+        # in the ambient env and find nothing).
         return ChatGoogleGenerativeAI(
             model=model,
             temperature=temperature,
-            **_maybe("google_api_key", settings.google_api_key),
+            **_maybe("google_api_key", settings.google_api_key or settings.gemini_api_key),
         )
 
     if "claude" in lowered:
