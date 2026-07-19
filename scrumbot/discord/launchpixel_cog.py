@@ -266,9 +266,10 @@ class LaunchPixelCog(commands.Cog):
                     tags = [
                         discord.ForumTag(name="New", emoji="🆕"),
                         discord.ForumTag(name="Planned", emoji="📅"),
-                        discord.ForumTag(name="Active", emoji="▶️"),
                         discord.ForumTag(name="Refining", emoji="🔧"),
-                        discord.ForumTag(name="Resolved", emoji="✅"),
+                        discord.ForumTag(name="Active", emoji="▶️"),
+                        discord.ForumTag(name="Reviewing", emoji="👀"),
+                        discord.ForumTag(name="Blocked", emoji="⛔"),
                         discord.ForumTag(name="Closed", emoji="📁"),
                     ]
                     try:
@@ -307,7 +308,7 @@ class LaunchPixelCog(commands.Cog):
         else:
             success_embed.add_field(
                 name="Kanban Forum Status",
-                value="📋 `#kanban-board` created with New, Planned, Active, Refining, Resolved, and Closed tags!",
+                value="📋 `#kanban-board` created with New, Planned, Refining, Active, Reviewing, Blocked, and Closed tags!",
                 inline=False,
             )
 
@@ -373,7 +374,7 @@ class LaunchPixelCog(commands.Cog):
         embed.add_field(name="👤 Assign Member", value="`!ticket assign <LP-X> <@Member>`", inline=False)
         embed.add_field(
             name="▶️ Update Status",
-            value="`!ticket status <LP-X> <New|Planned|Active|Refining|Resolved|Closed>`",
+            value="`!ticket status <LP-X> <New|Planned|Refining|Active|Reviewing|Blocked|Closed>`",
             inline=False,
         )
         embed.add_field(name="📋 List Tickets", value="`!ticket list`", inline=False)
@@ -590,11 +591,11 @@ class LaunchPixelCog(commands.Cog):
 
         ticket_id = ticket_id.upper()
         status = status.capitalize()
-        valid_statuses = ["New", "Planned", "Active", "Refining", "Resolved", "Closed"]
+        valid_statuses = ["New", "Planned", "Refining", "Active", "Reviewing", "Blocked", "Closed"]
         if status not in valid_statuses:
             await ctx.send(
-                "❌ Invalid status! Choose from: `New`, `Planned`, `Active`, `Refining`, "
-                "`Resolved`, `Closed`"
+                "❌ Invalid status! Choose from: `New`, `Planned`, `Refining`, `Active`, "
+                "`Reviewing`, `Blocked`, `Closed`"
             )
             return
 
@@ -628,7 +629,7 @@ class LaunchPixelCog(commands.Cog):
                 f"🔄 Status changed: **{old_status}** ➡️ **{status}** (updated by {ctx.author.name})"
             )
 
-        if status in ("Closed", "Resolved") and channel:
+        if status == "Closed" and channel:
             archive_category = discord.utils.find(
                 lambda c: c.name.lower() == "archived workspaces", ctx.guild.categories
             )
@@ -765,7 +766,7 @@ class LaunchPixelCog(commands.Cog):
             value=(
                 "• `!ticket create Title | Description | [Assignee] | [Priority] | [SP] | [Days] | [Start] | [End] | [Acceptance]`\n"
                 "• `!ticket assign <LP-X> <@Member>`\n"
-                "• `!ticket status <LP-X> <New/Planned/Active/Refining/Resolved/Closed>` (auto-archives when Resolved/Closed)\n"
+                "• `!ticket status <LP-X> <New/Planned/Refining/Active/Reviewing/Blocked/Closed>` (auto-archives when Closed)\n"
                 "• `!ticket list` — active board from Neon Postgres\n"
                 "• `!ticket view <LP-X>` — full details, comments & attachments"
             ),
@@ -776,7 +777,7 @@ class LaunchPixelCog(commands.Cog):
             value=(
                 "• `!standup` - Opens a daily standup thread for updates.\n"
                 "• `!blocker <details>` - Ask the **AI Scrum Master (Gemini)** for fast, expert unblocking advice.\n\n"
-                "*Slash commands (`/ask`, `/board`, `/task`, `/sync`) are powered by the NVIDIA Nemotron core agent.*"
+                "*Slash commands (`/ask`, `/board`, `/board_publish`, `/ticket_new`, `/ticket_move`, `/ticket_view`) are powered by the Cloudflare Worker Scrum Master.*"
             ),
             inline=False,
         )
@@ -864,7 +865,7 @@ class LaunchPixelCog(commands.Cog):
         self, interaction: discord.Interaction, ticket_id: str, action: str
     ) -> None:
         """Callback for TaskView buttons — updates DB, Kanban tag, and channel."""
-        status_map = {"done": "Resolved", "blocked": "Active", "in_progress": "Active"}
+        status_map = {"done": "Reviewing", "blocked": "Blocked", "in_progress": "Active"}
         status = status_map.get(action, "Active")
         label = action.replace("_", " ").title()
         ticket_id = ticket_id.upper()

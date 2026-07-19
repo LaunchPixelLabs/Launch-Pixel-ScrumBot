@@ -14,7 +14,13 @@ Run this command once to build your entire operations workspace instantly:
 ---
 
 ## 🎫 2. JIRA/DevOps Ticketing System (`!`)
-Manage your team roadmap, story points, and timelines directly from Discord text channels.
+Manage your team roadmap, story points, and timelines through the full web board, with Discord forum cards kept in sync.
+
+### 🗂️ Azure-style Board (`/`)
+* **`/devops`**: Sends you a private link to the full LaunchPixel DevOps board with drag/drop lanes, filters, create/edit forms, story points, due dates, labels, and Discord thread links.
+* **`/board`**: Shows a rich board snapshot grouped by `New`, `Planned`, `Refining`, `Active`, `Reviewing`, and `Blocked`.
+* **`/board_publish`**: Run this once inside the text channel that should hold the Discord mirror. LP_Bot creates one live dashboard header plus one live lane message per board column and refreshes them after card changes.
+* **`/ticket_new` / `/ticket_move` / `/ticket_view`**: Slash-command work-item management with forum cards and move dropdowns.
 
 ### 🆕 Create Ticket
 * **Syntax**: `!ticket create Title | Description | [Assignee] | [Priority] | [Story Points] | [Days] | [Start Date] | [End Date] | [Acceptance Criteria]`
@@ -34,10 +40,10 @@ Manage your team roadmap, story points, and timelines directly from Discord text
 * **System Action**: Updates the ticket record in Neon, pings the assignee inside their active workspace room, and updates the channel's description.
 
 ### 🔄 Shift Status
-* **Syntax**: `!ticket status <ID> <New/Planned/Active/Refining/Resolved/Closed>`
+* **Syntax**: `!ticket status <ID> <New/Planned/Refining/Active/Reviewing/Blocked/Closed>`
 * **Example**: `!ticket status LP-1 Active`
 * **System Action**: Shuffles the tags of the card inside the `#kanban-board` forum.
-* **🔒 Smart Auto-Archive**: Shifting status to `Closed` or `Resolved` automatically moves the workspace channel down to the `📁 ARCHIVED TICKETS` category and revokes write permissions (making it read-only), keeping your server clean while preserving historical chat records!
+* **🔒 Smart Auto-Archive**: Shifting status to `Closed` automatically moves the workspace channel down to the `📁 ARCHIVED TICKETS` category and revokes write permissions (making it read-only), keeping your server clean while preserving historical chat records!
 
 ### 📋 Board Overview
 * **Syntax**: `!ticket list`

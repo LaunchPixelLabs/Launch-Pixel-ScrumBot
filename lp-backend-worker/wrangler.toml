@@ -1,9 +1,63 @@
-name = "lp-backend-worker"
-main = "src/index.js"
-compatibility_date = "2024-05-01"
+name = "lp-bot"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Logs + traces in the Cloudflare dashboard so the 24/7 loop is debuggable.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# The 24/7 autonomous Scrum-Master shift. Every 30 minutes the Worker wakes,
+# runs ONE rotating focus, and posts anything worthwhile to Discord. 30 min
+# (not 10) keeps us well inside the Gemini free-tier quota and avoids spam.
+[triggers]
+crons = ["*/30 * * * *"]
+
+# KV holds the autonomous-loop focus pointer. Create it with:
+#   wrangler kv namespace create LP_STATE
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "LP_STATE"
+id = "d18619530d0d4de1abc3a287f5ac3903"
 
 [vars]
-DATABASE_URL = "YOUR_DATABASE_URL_HERE"
+APPLICATION_ID = "1508225212133412995"
+DISCORD_PUBLIC_KEY = "366c4fb743a847d2af65a72564ea95663c7d33122b21f176c9911f2cf1384e38"
+PRIMARY_MODEL = "gemini-3.5-flash"
+GROQ_MODEL = "openai/gpt-oss-120b"
+SECONDARY_MODEL = "meta/llama-3.1-8b-instruct"
+# Where the 24/7 loop posts (Launch Pixel server). Each focus routes to its
+# natural channel; everything else falls back to the exec boardroom.
+AUTONOMOUS_CHANNEL_ID = "1508253207091220481"  # #exec-boardroom (default home)
+STANDUP_CHANNEL_ID    = "1508253217937555618"  # #daily-standup-logs (accountability)
+AI_CHANNEL_ID         = "1515017756460974213"  # #ai-intern (knowledge/learning)
+LEADS_CHANNEL_ID      = "1508253247935348766"  # #mkt-campaign-tracking (leads)
+INCIDENTS_CHANNEL_ID  = "1508253225890091179"  # #incident-alerts (high/critical)
+BLOCKERS_CHANNEL_ID   = "1508253227798368256"  # #blocker-resolution (medium)
+FOUNDER_DISCORD_ID    = "773480425594683403"   # Vivek (guild owner) — DM + @mention
 WHATSAPP_VERIFY_TOKEN = "launchpixel_token"
-# To enable instant WhatsApp to Discord routing with zero lag, paste your Discord Channel Webhook URL here:
 DISCORD_WHATSAPP_WEBHOOK_URL = ""
+DISCORD_GUILD_ID = "1508222418479743046"
+PUBLIC_BOARD_URL = "https://admin.launchpixel.in/admin/devops-board"
+# The #kanban-board FORUM channel. 1 ticket = 1 post; the forum tag = the column.
+# Get it: Discord → enable Developer Mode → right-click #kanban-board → Copy Channel ID.
+# Until this is set, the board code no-ops safely (tickets still save to the DB).
+KANBAN_FORUM_CHANNEL_ID = "1508251613687713822"
+# Optional text channel where /board_publish maintains the Azure-style dashboard.
+KANBAN_DASHBOARD_CHANNEL_ID = "1528163566778056874"
+# Admin dashboard (Launch-Pixel-Admin) — the source of truth for kanban/task
+# data. LP_Bot reads/writes tasks through its bot-facing API instead of its
+# own `tickets` table; see src/adminApi.ts.
+ADMIN_API_BASE_URL = "https://admin.launchpixel.in"
+
+# --- Secrets (set with `wrangler secret put <NAME>`; never commit these) -----
+#   DISCORD_TOKEN     Bot token
+#   GEMINI_API_KEY    Google Gemini (lead brain)
+#   GROQ_API_KEY      Groq fast brain
+#   NVIDIA_API_KEY    NVIDIA NIM (second brain)
+#   NVIDIA2_API_KEY   optional backup NIM key
+#   DATABASE_URL      Neon Postgres connection string
+#   COMPOSIO_API_KEY  optional (Composio follow-up)
+#   BOARD_ADMIN_TOKEN optional write token for /devops-board mutations (legacy; board is retired, safe to leave unset)
+#   ADMIN_API_KEY     Auth for Admin's bot-facing task API (matches Admin's LP_BOT_API_KEY)

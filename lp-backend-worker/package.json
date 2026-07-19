@@ -1,44 +1,24 @@
 {
-  "name": "lp-scrum-bot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "lp-bot",
+  "version": "2.0.0",
+  "description": "LP_Bot — LaunchPixel's 24/7 AI Scrum Master on Cloudflare Workers (Discord interactions + dual-brain council + Neon memory).",
+  "main": "src/index.ts",
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir dist",
+    "register": "node scripts/register-commands.mjs",
+    "logs": "wrangler tail"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/LaunchPixelLabs/Launch-Pixel-ScrumBot.git"
-  },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/LaunchPixelLabs/Launch-Pixel-ScrumBot/issues"
-  },
-  "homepage": "https://github.com/LaunchPixelLabs/Launch-Pixel-ScrumBot#readme",
   "dependencies": {
-    "@composio/core": "^0.13.1",
-    "@composio/langchain": "^0.10.0",
-    "@langchain/core": "^1.2.2",
-    "@langchain/openai": "^1.5.4",
     "@neondatabase/serverless": "^1.1.0",
     "discord-interactions": "^4.4.0",
-    "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.45.2",
-    "express": "^5.2.1",
-    "hono": "^4.12.28",
-    "langchain": "^1.5.3"
+    "hono": "^4.12.28"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^26.1.1",
-    "drizzle-kit": "^0.31.10",
-    "nodemon": "^3.1.14",
-    "ts-node": "^10.9.2",
-    "typescript": "^7.0.2",
-    "wrangler": "^4.109.0"
+    "typescript": "^5.6.2",
+    "wrangler": "^4.81.0"
   }
 }
